@@ -1,0 +1,31 @@
+/vendor/
+/composer.lock
+.phpunit.result.cache
+.idea/
+.vscode/
+*.cache
+*.log
+
+# PHP specific
+*.phar
+.php-cs-fixer.cache
+.php_cs.cache
+.php-cs-fixer.php
+phpunit.xml.dist.bak
+
+# OS specific
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Coverage reports
+/coverage/
+/coverage.xml
+/clover.xml
+/.phpunit.cache/
+
+# Environment files
+.env
+.env.local
+.env.*.local
