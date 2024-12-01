@@ -6,23 +6,20 @@ namespace Clotho;
 
 use Clotho\Attribute\EventAfter;
 use Clotho\Attribute\EventBefore;
-use Clotho\Event\AfterFunctionEvent;
 use Clotho\Event\AfterMethodEvent;
-use Clotho\Event\BeforeFunctionEvent;
 use Clotho\Event\BeforeMethodEvent;
 use Clotho\Event\EventDispatcher;
-use ReflectionFunction;
-use ReflectionMethod;
 
 class EventAttributeHandler
 {
     public function __construct(
         private EventDispatcher $dispatcher
-    ) {}
+    ) {
+    }
 
     public function wrapMethod(object $object, string $methodName): callable
     {
-        $reflectionMethod = new ReflectionMethod($object, $methodName);
+        $reflectionMethod = new \ReflectionMethod($object, $methodName);
         $beforeAttributes = $reflectionMethod->getAttributes(EventBefore::class);
         $afterAttributes = $reflectionMethod->getAttributes(EventAfter::class);
 
@@ -30,11 +27,7 @@ class EventAttributeHandler
             foreach ($beforeAttributes as $attribute) {
                 $beforeEvent = $attribute->newInstance();
                 $event = new BeforeMethodEvent($object, $methodName, $arguments);
-                
-                // Dispatch the event object for priority tests
                 $this->dispatcher->dispatch($event);
-                
-                // Dispatch the named event for attribute tests
                 $this->dispatcher->dispatch($beforeEvent->getEventName() ?? $methodName . '.before', [
                     'event' => $event,
                     'object' => $object,
@@ -53,11 +46,7 @@ class EventAttributeHandler
                 foreach ($afterAttributes as $attribute) {
                     $afterEvent = $attribute->newInstance();
                     $event = new AfterMethodEvent($object, $methodName, $arguments, $result);
-                    
-                    // Dispatch the event object for priority tests
                     $this->dispatcher->dispatch($event);
-                    
-                    // Dispatch the named event for attribute tests
                     $this->dispatcher->dispatch($afterEvent->getEventName() ?? $methodName . '.after', [
                         'event' => $event,
                         'object' => $object,
@@ -76,11 +65,7 @@ class EventAttributeHandler
                 foreach ($afterAttributes as $attribute) {
                     $afterEvent = $attribute->newInstance();
                     $event = new AfterMethodEvent($object, $methodName, $arguments, null, $e);
-                    
-                    // Dispatch the event object for priority tests
                     $this->dispatcher->dispatch($event);
-                    
-                    // Dispatch the named event for attribute tests
                     $this->dispatcher->dispatch($afterEvent->getEventName() ?? $methodName . '.after', [
                         'event' => $event,
                         'object' => $object,
@@ -99,79 +84,72 @@ class EventAttributeHandler
         };
     }
 
-    public function wrapFunction(string $functionName): callable
+    public function handleMethodCall(object $object, string $method, array $arguments): mixed
     {
-        $reflectionFunction = new ReflectionFunction($functionName);
-        $beforeAttributes = $reflectionFunction->getAttributes(EventBefore::class);
-        $afterAttributes = $reflectionFunction->getAttributes(EventAfter::class);
+        $beforeEvent = new BeforeMethodEvent($object, $method, $arguments);
+        $this->dispatcher->dispatch($beforeEvent);
 
-        return function (...$arguments) use ($functionName, $beforeAttributes, $afterAttributes) {
-            foreach ($beforeAttributes as $attribute) {
-                $beforeEvent = $attribute->newInstance();
-                $event = new BeforeFunctionEvent($functionName, $arguments);
-                
-                // Dispatch the event object for priority tests
-                $this->dispatcher->dispatch($event);
-                
-                // Dispatch the named event for attribute tests
-                $this->dispatcher->dispatch($beforeEvent->getEventName() ?? $functionName . '.before', [
-                    'event' => $event,
-                    'function' => $functionName,
-                    'arguments' => $arguments,
-                ]);
-                
-                if ($event->isPropagationStopped()) {
-                    break;
-                }
-            }
+        if ($beforeEvent->isPropagationStopped()) {
+            return null;
+        }
 
-            try {
-                $result = $functionName(...$arguments);
-                
-                foreach ($afterAttributes as $attribute) {
-                    $afterEvent = $attribute->newInstance();
-                    $event = new AfterFunctionEvent($functionName, $arguments, $result);
-                    
-                    // Dispatch the event object for priority tests
-                    $this->dispatcher->dispatch($event);
-                    
-                    // Dispatch the named event for attribute tests
-                    $this->dispatcher->dispatch($afterEvent->getEventName() ?? $functionName . '.after', [
-                        'event' => $event,
-                        'function' => $functionName,
-                        'arguments' => $arguments,
-                        'result' => $result,
-                    ]);
-                    
-                    if ($event->isPropagationStopped()) {
-                        break;
-                    }
+        $result = null;
+        $exception = null;
+
+        try {
+            $result = $object->$method(...$arguments);
+        } catch (\Throwable $e) {
+            $exception = $e;
+        }
+
+        $afterEvent = new AfterMethodEvent($object, $method, $arguments, $result, $exception);
+        $this->dispatcher->dispatch($afterEvent);
+
+        if ($exception) {
+            throw $exception;
+        }
+
+        return $result;
+    }
+
+    public function registerAttributeListeners(object $object): void
+    {
+        $reflection = new \ReflectionObject($object);
+
+        foreach ($reflection->getMethods() as $method) {
+            $this->registerMethodListeners($object, $method);
+        }
+    }
+
+    private function registerMethodListeners(object $object, \ReflectionMethod $method): void
+    {
+        $beforeAttributes = $method->getAttributes(EventBefore::class);
+        $afterAttributes = $method->getAttributes(EventAfter::class);
+
+        foreach ($beforeAttributes as $attribute) {
+            $eventBefore = $attribute->newInstance();
+            $eventName = $eventBefore->getEventName() ?? BeforeMethodEvent::class;
+            $priority = $eventBefore->getPriority();
+
+            $this->dispatcher->addEventListener($eventName, function($event) use ($method, $object) {
+                if ($event instanceof BeforeMethodEvent) {
+                    return $method->invoke($object, $event);
                 }
-                
-                return $result;
-            } catch (\Throwable $e) {
-                foreach ($afterAttributes as $attribute) {
-                    $afterEvent = $attribute->newInstance();
-                    $event = new AfterFunctionEvent($functionName, $arguments, null, $e);
-                    
-                    // Dispatch the event object for priority tests
-                    $this->dispatcher->dispatch($event);
-                    
-                    // Dispatch the named event for attribute tests
-                    $this->dispatcher->dispatch($afterEvent->getEventName() ?? $functionName . '.after', [
-                        'event' => $event,
-                        'function' => $functionName,
-                        'arguments' => $arguments,
-                        'exception' => $e,
-                    ]);
-                    
-                    if ($event->isPropagationStopped()) {
-                        break;
-                    }
+                return $method->invoke($object, $event);
+            }, $priority);
+        }
+
+        foreach ($afterAttributes as $attribute) {
+            $eventAfter = $attribute->newInstance();
+            $eventName = $eventAfter->getEventName() ?? AfterMethodEvent::class;
+            $priority = $eventAfter->getPriority();
+
+            $this->dispatcher->addEventListener($eventName, function($event) use ($method, $object) {
+                if ($event instanceof AfterMethodEvent) {
+                    return $method->invoke($object, $event);
                 }
-                
-                throw $e;
-            }
-        };
+                return $method->invoke($object, $event);
+            }, $priority);
+        }
     }
 }

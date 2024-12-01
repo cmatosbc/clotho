@@ -4,34 +4,23 @@ declare(strict_types=1);
 
 namespace Clotho\Event;
 
-use Psr\EventDispatcher\StoppableEventInterface;
+use Clotho\Event\Event;
 
-final class BeforeFunctionEvent implements StoppableEventInterface
+final class BeforeFunctionEvent extends Event
 {
-    private bool $propagationStopped = false;
-
     public function __construct(
-        private string $functionName,
+        private string $function,
         private array $arguments
-    ) {}
+    ) {
+    }
 
-    public function getFunctionName(): string
+    public function getFunction(): string
     {
-        return $this->functionName;
+        return $this->function;
     }
 
     public function getArguments(): array
     {
         return $this->arguments;
-    }
-
-    public function isPropagationStopped(): bool
-    {
-        return $this->propagationStopped;
-    }
-
-    public function stopPropagation(): void
-    {
-        $this->propagationStopped = true;
     }
 }

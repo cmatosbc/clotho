@@ -4,15 +4,16 @@ declare(strict_types=1);
 
 namespace Clotho\Event;
 
+use Clotho\Event\Event;
 use Psr\EventDispatcher\StoppableEventInterface;
 
-final class AfterMethodEvent implements StoppableEventInterface
+final class AfterMethodEvent extends Event implements StoppableEventInterface
 {
     private bool $propagationStopped = false;
 
     public function __construct(
         private object $object,
-        private string $methodName,
+        private string $method,
         private array $arguments,
         private mixed $result = null,
         private ?\Throwable $exception = null
@@ -23,9 +24,9 @@ final class AfterMethodEvent implements StoppableEventInterface
         return $this->object;
     }
 
-    public function getMethodName(): string
+    public function getMethod(): string
     {
-        return $this->methodName;
+        return $this->method;
     }
 
     public function getArguments(): array

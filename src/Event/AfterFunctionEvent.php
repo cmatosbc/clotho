@@ -4,22 +4,21 @@ declare(strict_types=1);
 
 namespace Clotho\Event;
 
-use Psr\EventDispatcher\StoppableEventInterface;
+use Clotho\Event\Event;
 
-final class AfterFunctionEvent implements StoppableEventInterface
+class AfterFunctionEvent extends Event
 {
-    private bool $propagationStopped = false;
-
     public function __construct(
-        private string $functionName,
+        private string $function,
         private array $arguments,
         private mixed $result = null,
         private ?\Throwable $exception = null
-    ) {}
+    ) {
+    }
 
-    public function getFunctionName(): string
+    public function getFunction(): string
     {
-        return $this->functionName;
+        return $this->function;
     }
 
     public function getArguments(): array
@@ -35,20 +34,5 @@ final class AfterFunctionEvent implements StoppableEventInterface
     public function getException(): ?\Throwable
     {
         return $this->exception;
-    }
-
-    public function hasException(): bool
-    {
-        return $this->exception !== null;
-    }
-
-    public function isPropagationStopped(): bool
-    {
-        return $this->propagationStopped;
-    }
-
-    public function stopPropagation(): void
-    {
-        $this->propagationStopped = true;
     }
 }

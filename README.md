@@ -304,14 +304,63 @@ $dispatcher->addEventListener(BeforeMethodEvent::class, function (BeforeMethodEv
 
 ## Error Handling
 
+Clotho provides a set of custom exceptions for handling error conditions in the event system. These exceptions are used only for truly exceptional cases, not for normal flow control.
+
+### Exception Types
+
 ```php
+use Clotho\Exception\EventDispatchException;
+use Clotho\Exception\EventListenerException;
+use Clotho\Exception\EventPropagationException;
+
+// Invalid event name
 try {
-    $result = $createUser('John Doe', 'invalid-email');
-} catch (EventException $e) {
-    // Handle event-related errors
-} catch (ValidationException $e) {
-    // Handle validation errors
+    $dispatcher->dispatch(''); // Empty event name
+} catch (EventDispatchException $e) {
+    // Handles dispatch-related errors:
+    // - Empty or invalid event names
+    // - Errors thrown by event listeners
 }
+
+// Invalid listener priority
+try {
+    // Priority must be between -100 and 100
+    $dispatcher->addEventListener('user.create', $listener, 150);
+} catch (EventListenerException $e) {
+    // Handles listener-related errors:
+    // - Invalid priority values
+    // - Invalid listener types
+}
+```
+
+### Normal Flow Control
+
+The following scenarios are handled as normal flow control, not exceptions:
+
+```php
+// 1. Events with no listeners - perfectly valid
+$dispatcher->dispatch('user.created', ['id' => 123]);
+
+// 2. Stopping event propagation - normal control flow
+$dispatcher->addEventListener('user.delete', function (BeforeMethodEvent $event) {
+    if (!$this->hasPermission()) {
+        $event->stopPropagation(); // Stops further listeners, no exception
+        return;
+    }
+    // Process the event
+}, 20);
+
+// 3. Wildcard events with no matches - also valid
+$dispatcher->dispatch('custom.event');
+```
+
+### Exception Hierarchy
+
+```
+EventException
+├── EventDispatchException  // For dispatch-related errors
+├── EventListenerException  // For listener configuration errors
+└── EventPropagationException  // Reserved for future propagation-related errors
 ```
 
 ## Event Payload Structure
