@@ -212,57 +212,94 @@ $dispatcher->addEventListener('user.create', function (array $payload) {
 
 ## Advanced Features
 
-### Custom Event Objects
+### Event Objects
+
+Clotho provides dedicated event objects for different scenarios:
 
 ```php
-class UserCreatedEvent implements StoppableEventInterface
-{
-    private bool $propagationStopped = false;
+use Clotho\Event\BeforeMethodEvent;
+use Clotho\Event\AfterMethodEvent;
+use Clotho\Event\BeforeFunctionEvent;
+use Clotho\Event\AfterFunctionEvent;
 
-    public function __construct(
-        private string $username,
-        private string $email
-    ) {}
-
-    public function isPropagationStopped(): bool
-    {
-        return $this->propagationStopped;
+// Listen for method events
+$dispatcher->addEventListener(BeforeMethodEvent::class, function (BeforeMethodEvent $event) {
+    $methodName = $event->getMethodName();
+    $arguments = $event->getArguments();
+    
+    if (!$this->isValid($arguments)) {
+        $event->stopPropagation();
     }
+}, 10);
 
-    public function stopPropagation(): void
-    {
-        $this->propagationStopped = true;
+// Listen for after events with results
+$dispatcher->addEventListener(AfterMethodEvent::class, function (AfterMethodEvent $event) {
+    if ($event->hasException()) {
+        $this->handleError($event->getException());
+        return;
     }
-}
+    
+    $result = $event->getResult();
+    $this->processResult($result);
+});
+```
+
+### Priority-based Event Handling
+
+Events can be handled with different priorities, where higher priority listeners execute first:
+
+```php
+use Clotho\Event\BeforeMethodEvent;
+
+// High priority validation
+$dispatcher->addEventListener(BeforeMethodEvent::class, function (BeforeMethodEvent $event) {
+    // Runs first (priority 20)
+    if (!$this->hasPermission()) {
+        $event->stopPropagation();
+    }
+}, 20);
+
+// Normal priority logging
+$dispatcher->addEventListener(BeforeMethodEvent::class, function (BeforeMethodEvent $event) {
+    // Runs second (priority 10)
+    $this->logAccess($event->getMethodName());
+}, 10);
+
+// Low priority operations
+$dispatcher->addEventListener(BeforeMethodEvent::class, function (BeforeMethodEvent $event) {
+    // Runs last (priority 0)
+    $this->notify($event->getMethodName());
+}, 0);
+```
+
+### Event Propagation Control
+
+All event objects implement `StoppableEventInterface`, allowing you to control event propagation:
+
+```php
+use Clotho\Event\BeforeMethodEvent;
 
 class UserService
 {
-    #[EventAfter]
-    public function createUser(string $username, string $email): UserCreatedEvent
+    #[EventBefore]
+    public function deleteUser(int $userId): void
     {
-        return new UserCreatedEvent($username, $email);
-    }
-}
-```
-
-### Dynamic Event Names
-
-```php
-class ContentService
-{
-    #[EventBefore('content.{type}.create')]
-    public function createContent(string $type, array $data): array
-    {
-        return [
-            'type' => $type,
-            'data' => $data,
-            'created_at' => new DateTime(),
-        ];
+        // Delete user logic
     }
 }
 
-// This will trigger 'content.article.create' or 'content.page.create'
-// depending on the $type parameter
+// High priority security check
+$dispatcher->addEventListener(BeforeMethodEvent::class, function (BeforeMethodEvent $event) {
+    if (!$this->hasPermission('delete_users')) {
+        $event->stopPropagation(); // Prevents further listeners from executing
+        throw new SecurityException('Permission denied');
+    }
+}, 20);
+
+// This won't execute if permission check fails
+$dispatcher->addEventListener(BeforeMethodEvent::class, function (BeforeMethodEvent $event) {
+    $this->logDeletion($event->getArguments()[0]);
+}, 10);
 ```
 
 ## Error Handling
@@ -400,4 +437,3 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 ---
 
 Built with ❤️ by [Carlos Artur Matos](https://github.com/cmatosbc)
-`
