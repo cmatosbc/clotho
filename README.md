@@ -21,7 +21,7 @@ Clotho is a modern, attribute-based event system for PHP 8.1+. It provides a pow
 ## Installation
 
 ```bash
-composer require your-vendor/clotho
+composer require cmatosbc/clotho
 ```
 
 ## Basic Usage
@@ -277,6 +277,94 @@ try {
 }
 ```
 
+## Event Payload Structure
+
+When using named events, Clotho dispatches an array with the following structure:
+
+#### Before Method Events
+```php
+[
+    'event' => BeforeMethodEvent,    // The actual event object
+    'object' => object,              // The object instance the method belongs to
+    'method' => string,              // Name of the method being called
+    'arguments' => array,            // Array of arguments passed to the method
+]
+```
+
+#### After Method Events
+```php
+[
+    'event' => AfterMethodEvent,     // The actual event object
+    'object' => object,              // The object instance the method belongs to
+    'method' => string,              // Name of the method being called
+    'arguments' => array,            // Array of arguments passed to the method
+    'result' => mixed,               // The return value from the method (if successful)
+    'exception' => Throwable|null    // Exception object if method threw an exception
+]
+```
+
+#### Before Function Events
+```php
+[
+    'event' => BeforeFunctionEvent,  // The actual event object
+    'function' => string,            // Name of the function being called
+    'arguments' => array,            // Array of arguments passed to the function
+]
+```
+
+#### After Function Events
+```php
+[
+    'event' => AfterFunctionEvent,   // The actual event object
+    'function' => string,            // Name of the function being called
+    'arguments' => array,            // Array of arguments passed to the function
+    'result' => mixed,               // The return value from the function (if successful)
+    'exception' => Throwable|null    // Exception object if function threw an exception
+]
+```
+
+Example usage with payload:
+
+```php
+use Clotho\Attribute\EventBefore;
+use Clotho\Attribute\EventAfter;
+
+class UserService
+{
+    #[EventBefore('user.create')]
+    #[EventAfter('user.create')]
+    public function createUser(string $name, string $email): array
+    {
+        return [
+            'id' => 1,
+            'name' => $name,
+            'email' => $email,
+        ];
+    }
+}
+
+// Access payload in before event
+$dispatcher->addEventListener('user.create', function (array $payload) {
+    $event = $payload['event'];           // BeforeMethodEvent instance
+    $object = $payload['object'];         // UserService instance
+    $method = $payload['method'];         // "createUser"
+    $arguments = $payload['arguments'];   // [$name, $email]
+    
+    echo "Creating user {$arguments[0]} with email {$arguments[1]}";
+});
+
+// Access payload in after event
+$dispatcher->addEventListener('user.create', function (array $payload) {
+    if (isset($payload['exception'])) {
+        echo "Error creating user: " . $payload['exception']->getMessage();
+        return;
+    }
+    
+    $result = $payload['result'];  // The returned user array
+    echo "Created user with ID: {$result['id']}";
+});
+```
+
 ## Best Practices
 
 1. **Event Naming**:
@@ -311,4 +399,5 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 
 ---
 
-Built with ❤️ by [Your Name/Organization]
+Built with ❤️ by [Carlos Artur Matos](https://github.com/cmatosbc)
+`
