@@ -26,6 +26,8 @@ composer require cmatosbc/clotho
 
 ## Basic Usage
 
+For more detailed examples and use cases, check out the `examples/` folder in this repository.
+
 ### 1. Simple Event Handling
 
 ```php
