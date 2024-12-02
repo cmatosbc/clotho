@@ -1,5 +1,5 @@
 {
-    "name": "clotho/clotho",
+    "name": "cmatosbc/clotho",
     "description": "A PHP event system with attribute-based event handling",
     "type": "library",
     "license": "GPL-3.0-or-later",
